@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+    triggers { 
+        pollSCM('*/1 * * * *') 
+    }
+    stages {
+        stage('build') {
+            steps {
+                sh "docker build -t darkogorgievski4567/mvn_tests ."
+            }
+        }
+        stage('deploy-dev') {
+            steps {
+                script{
+                    deploy("DEV")
+                }
+            }
+        }
+        stage('test-dev') {
+            steps {
+                script{
+                    test("DEV")
+                }
+            }
+        }
+        stage('deploy-prd') {
+            steps {
+                script{
+                    deploy("PRD")
+                }
+            }
+        }
+        stage('test-prd') {
+            steps {
+                script{
+                    test("PRD")
+                }
+            }
+        }
+    }
+    post { 
+        always { 
+            echo 'This will be always executed'
+        }
+        success{
+            echo 'This will be executed on success'
+        }
+        failure{
+            echo 'This will be executed on failure'
+        }
+    }
+}
+
+def deploy(String environment){
+    echo "Deployment on ${environment} environmnt triggered.."
+}
+
+def test(String environment){
+    echo "Tests on ${environment} environmnt triggered.."
+    sh "docker compose up"
+    browsers = ['chrome', 'firefox']
+        for (int i = 0; i < browsers.size(); ++i) {
+            echo "Running UI tests on ${environment} environemnt and on ${browsers[i]} browser"
+            sh "docker run -it --network=test-automation-setup darkogorgievski4567/mvn_tests_${environment}:latest mvn clean test -Dbrowser=${browsers[i]} -DgridURL=selenium-hub:4444"
+        }
+    try{
+        sh "bash send_notification.sh “dev deployment” 0"
+    }
+    finally{
+        sh "docker rm -f darkogorgievski4567/mvn_tests_${environment}"
+        sh "ls"
+    }
+}
